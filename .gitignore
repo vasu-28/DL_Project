@@ -1,0 +1,31 @@
+.codex
+.codex/
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Dataset directories
+train/
+add_train/
+validation_data/
+processed/
+
+# Training outputs and model artifacts
+checkpoints/
+runs/
+*.pth
+*.pt
+*.ckpt
+*.npz
+
+# Logs and local outputs
+*.log
+training.log
+
+# OS/editor files
+.DS_Store
