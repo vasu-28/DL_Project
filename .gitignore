@@ -23,9 +23,7 @@ runs/
 *.ckpt
 *.npz
 
-# Logs and local outputs
-*.log
-training.log
+
 
 # OS/editor files
 .DS_Store
