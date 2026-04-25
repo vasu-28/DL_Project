@@ -232,7 +232,7 @@ class BraTSDataset(Dataset):
     """
 
     def __init__(self, data_dir, mode='train', missing_strategy='random',
-                 fixed_missing=None, min_present=1, augment=False):
+                 fixed_missing=None, min_present=1, augment=False, file_list=None):
         self.data_dir = data_dir
         self.mode = mode
         self.missing_strategy = missing_strategy
@@ -240,7 +240,10 @@ class BraTSDataset(Dataset):
         self.min_present = min_present
         self.augment = augment and (mode == 'train')
 
-        self.file_list = sorted(glob.glob(os.path.join(data_dir, "*.npz")))
+        if file_list is not None:
+            self.file_list = file_list
+        else:
+            self.file_list = sorted(glob.glob(os.path.join(data_dir, "*.npz")))
         if len(self.file_list) == 0:
             raise FileNotFoundError(f"No .npz files in {data_dir}")
 

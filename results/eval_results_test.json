@@ -1,0 +1,137 @@
+[
+  {
+    "WT": 0.738998,
+    "TC": 0.284571,
+    "ET": 0.262773,
+    "Mean": 0.428781,
+    "mean_vacuity": 0.089866,
+    "combo": "T1",
+    "n_present": 1
+  },
+  {
+    "WT": 0.727695,
+    "TC": 0.625009,
+    "ET": 0.641189,
+    "Mean": 0.664631,
+    "mean_vacuity": 0.08988,
+    "combo": "T1ce",
+    "n_present": 1
+  },
+  {
+    "WT": 0.811972,
+    "TC": 0.254495,
+    "ET": 0.236771,
+    "Mean": 0.434413,
+    "mean_vacuity": 0.090405,
+    "combo": "T2",
+    "n_present": 1
+  },
+  {
+    "WT": 0.837157,
+    "TC": 0.305971,
+    "ET": 0.270749,
+    "Mean": 0.471292,
+    "mean_vacuity": 0.090735,
+    "combo": "FLAIR",
+    "n_present": 1
+  },
+  {
+    "WT": 0.767463,
+    "TC": 0.654135,
+    "ET": 0.647119,
+    "Mean": 0.689572,
+    "mean_vacuity": 0.089902,
+    "combo": "T1 + T1ce",
+    "n_present": 2
+  },
+  {
+    "WT": 0.835291,
+    "TC": 0.314017,
+    "ET": 0.276753,
+    "Mean": 0.475354,
+    "mean_vacuity": 0.089971,
+    "combo": "T1 + T2",
+    "n_present": 2
+  },
+  {
+    "WT": 0.86398,
+    "TC": 0.33221,
+    "ET": 0.297902,
+    "Mean": 0.498031,
+    "mean_vacuity": 0.090477,
+    "combo": "T1 + FLAIR",
+    "n_present": 2
+  },
+  {
+    "WT": 0.834407,
+    "TC": 0.667516,
+    "ET": 0.65291,
+    "Mean": 0.718278,
+    "mean_vacuity": 0.09,
+    "combo": "T1ce + T2",
+    "n_present": 2
+  },
+  {
+    "WT": 0.865906,
+    "TC": 0.674499,
+    "ET": 0.667587,
+    "Mean": 0.735997,
+    "mean_vacuity": 0.089784,
+    "combo": "T1ce + FLAIR",
+    "n_present": 2
+  },
+  {
+    "WT": 0.874454,
+    "TC": 0.345954,
+    "ET": 0.298827,
+    "Mean": 0.506412,
+    "mean_vacuity": 0.090896,
+    "combo": "T2 + FLAIR",
+    "n_present": 2
+  },
+  {
+    "WT": 0.83952,
+    "TC": 0.690269,
+    "ET": 0.677532,
+    "Mean": 0.735774,
+    "mean_vacuity": 0.089982,
+    "combo": "T1 + T1ce + T2",
+    "n_present": 3
+  },
+  {
+    "WT": 0.868057,
+    "TC": 0.721912,
+    "ET": 0.712888,
+    "Mean": 0.767619,
+    "mean_vacuity": 0.089885,
+    "combo": "T1 + T1ce + FLAIR",
+    "n_present": 3
+  },
+  {
+    "WT": 0.874254,
+    "TC": 0.372813,
+    "ET": 0.317647,
+    "Mean": 0.521571,
+    "mean_vacuity": 0.090703,
+    "combo": "T1 + T2 + FLAIR",
+    "n_present": 3
+  },
+  {
+    "WT": 0.876839,
+    "TC": 0.693295,
+    "ET": 0.679811,
+    "Mean": 0.749982,
+    "mean_vacuity": 0.090042,
+    "combo": "T1ce + T2 + FLAIR",
+    "n_present": 3
+  },
+  {
+    "WT": 0.877067,
+    "TC": 0.715185,
+    "ET": 0.709231,
+    "Mean": 0.767161,
+    "mean_vacuity": 0.09005,
+    "combo": "T1 + T1ce + T2 + FLAIR",
+    "n_present": 4
+  }
+]

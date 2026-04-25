@@ -221,5 +221,3 @@ python train.py --stage eval --checkpoint checkpoints/best_model.pth
 
 - Missing BraTS files during preprocessing
   Re-check the folder names and the modality suffixes in `brats_data_pipeline.py`.
-
-  

@@ -1,0 +1,39 @@
+  GPU  : NVIDIA RTX A5000
+  VRAM : 23.7 GB
+  SM   : 8.6
+  cuDNN: 8902
+  Params : 23,406,218  (23.4 M)
+BraTSDataset: 944 patients | mode=train | missing=random | augment=True
+BraTSDataset: 270 patients | mode=val | missing=none | augment=False
+BraTSDataset: 136 patients | mode=test | missing=none | augment=False
+
+  Data splits  (processed/train)
+  Train :  944 patients  |   944 batches  (bs=1)
+  Val   :  270 patients  |   270 batches
+  Test  :  136 patients  |   136 batches
+  Loaded: checkpoints/ssl_pretrained.pth  (new keys: 0)
+
+=================================================================
+  STAGE 2 — Supervised Fine-Tuning  (EMA Teacher + Evidential)
+  Epochs: 150  |  LR: 0.0002  |  AMP: True  |  grad_accum: 4
+=================================================================
+
+Train   1/150  drop=0.10:   0%|          | 0/944 [00:00<?, ?it/s]Train   1/150  drop=0.10:   0%|          | 0/944 [00:20<?, ?it/s, cons=0.003, evid=0.331, loss=2.148]Train   1/150  drop=0.10:   0%|          | 1/944 [00:20<5:17:05, 20.18s/it, cons=0.003, evid=0.331, loss=2.148]Train   1/150  drop=0.10:   0%|          | 1/944 [00:20<5:26:34, 20.78s/it, cons=0.003, evid=0.331, loss=2.148]
+Traceback (most recent call last):
+  File "/home/teaching/CS671_Project/train.py", line 1296, in <module>
+    train(model, tl, vl,
+  File "/home/teaching/CS671_Project/train.py", line 985, in train
+    s_out2 = model(s_vol2, s_mask2)
+  File "/home/teaching/miniconda3/envs/p19/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/teaching/miniconda3/envs/p19/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/teaching/CS671_Project/train.py", line 342, in forward
+    enc               = self.encoder(x, mod_mask)
+  File "/home/teaching/miniconda3/envs/p19/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/teaching/miniconda3/envs/p19/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/teaching/CS671_Project/train.py", line 207, in forward
+    fused = (stack * m).sum(1) / m.sum(1).clamp(min=1)    # mask-weighted mean
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacty of 23.67 GiB of which 958.81 MiB is free. Process 498809 has 4.75 GiB memory in use. Process 498974 has 4.75 GiB memory in use. Including non-PyTorch memory, this process has 12.72 GiB memory in use. Of the allocated memory 12.16 GiB is allocated by PyTorch, and 283.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF
