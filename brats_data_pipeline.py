@@ -282,11 +282,24 @@ class BraTSDataset(Dataset):
         return np.stack([wt, tc, et], axis=0)
 
     def _augment_volume(self, volume, seg):
+        # Random axis flips
         for axis in [1, 2, 3]:
             if random.random() > 0.5:
                 volume = np.flip(volume, axis=axis).copy()
                 if seg is not None:
                     seg = np.flip(seg, axis=axis - 1).copy()
+
+        # Per-modality intensity augmentation (z-scored data; scale then shift)
+        for c in range(volume.shape[0]):
+            if random.random() > 0.5:
+                volume[c] = volume[c] * np.random.uniform(0.85, 1.15)
+            if random.random() > 0.5:
+                volume[c] = volume[c] + np.random.uniform(-0.1, 0.1)
+
+        # Gaussian noise (small relative to z-score std of 1)
+        if random.random() > 0.5:
+            volume = volume + np.random.normal(0, 0.05, volume.shape).astype(np.float32)
+
         return volume, seg
 
     def __getitem__(self, idx):

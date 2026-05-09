@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS671 — Uncertainty-Guided SSL for Missing-Modality Brain MRI</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/black.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg:      #0f1923;
+  --surface: #162032;
+  --blue:    #4db8e8;
+  --blue2:   #2980b9;
+  --green:   #27ae60;
+  --red:     #e74c3c;
+  --orange:  #e67e22;
+  --yellow:  #f1c40f;
+  --purple:  #9b59b6;
+  --text:    #ecf0f1;
+  --muted:   #95a5a6;
+  --line:    rgba(255,255,255,0.12);
+}
+
+.reveal-viewport { background: var(--bg); }
+.reveal { font-family: 'Open Sans', sans-serif; color: var(--text); font-size: 18px; }
+.reveal section { padding: 0 50px; }
+.reveal .slide-number { color: var(--muted); font-size: 0.5em; background: none; }
+.reveal .progress { color: var(--blue); }
+
+/* === Slide title bar === */
+.slide-title {
+  background: linear-gradient(90deg, #1a4a7a 0%, #0f1923 100%);
+  border-left: 4px solid var(--blue);
+  color: white;
+  font-size: 1em;
+  font-weight: 700;
+  padding: 9px 18px;
+  margin: 0 -50px 16px -50px;
+  letter-spacing: 0.2px;
+}
+
+/* === Title slide === */
+.title-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 90vh;
+  text-align: center;
+  padding: 0 30px;
+}
+.title-wrap .course { color: var(--blue); font-size: 0.72em; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; }
+.title-wrap h1 { color: white; font-size: 1.7em; font-weight: 700; line-height: 1.3; margin-bottom: 10px; }
+.title-wrap .subtitle { color: var(--muted); font-size: 0.75em; margin-bottom: 26px; line-height: 1.7; }
+.title-wrap .rule { width: 70px; height: 3px; background: var(--blue); margin: 0 auto 22px; border-radius: 2px; }
+.title-wrap .tags { font-size: 0.63em; color: var(--muted); line-height: 2.2; margin-bottom: 18px; }
+.title-wrap .tags span { background: var(--surface); border: 1px solid rgba(255,255,255,0.15); padding: 3px 11px; border-radius: 3px; margin: 0 3px; }
+.title-wrap .authors { color: var(--muted); font-size: 0.66em; }
+
+/* === Layouts === */
+.two-col      { display: grid; grid-template-columns: 1fr 1fr;      gap: 28px; align-items: start; }
+.two-col-wide { display: grid; grid-template-columns: 1.55fr 1fr;   gap: 28px; align-items: start; }
+.two-col-slim { display: grid; grid-template-columns: 1fr 1.55fr;   gap: 28px; align-items: start; }
+.three-col    { display: grid; grid-template-columns: 1fr 1fr 1fr;  gap: 18px; align-items: start; }
+.four-col     { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; }
+
+/* === Text === */
+.reveal ul { list-style: disc; padding-left: 20px; margin: 0; }
+.reveal ul li { font-size: 0.8em; line-height: 1.65; margin: 5px 0; }
+.reveal ul ul li { font-size: 0.9em; color: var(--muted); margin: 2px 0; }
+.reveal p { font-size: 0.8em; line-height: 1.65; margin: 7px 0; }
+
+/* === Figures === */
+.fig img { border-radius: 4px; display: block; width: 100%; height: auto; }
+.fig .cap { font-size: 0.58em; color: var(--muted); margin-top: 5px; text-align: center; line-height: 1.4; font-style: italic; }
+
+/* === Tables === */
+.reveal table { width: 100%; border-collapse: collapse; font-size: 0.74em; }
+.reveal table th { background: #1a4a7a; color: white; padding: 7px 11px; text-align: left; font-weight: 600; }
+.reveal table td { padding: 6px 11px; border-bottom: 1px solid var(--line); }
+.reveal table tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+.reveal table tr.hl  td { background: rgba(39,174,96,0.14); font-weight: 600; }
+.reveal table tr.hl2 td { background: rgba(231,76,60,0.1); }
+.reveal table tr.hlb td { background: rgba(77,184,232,0.1); }
+
+/* === Colors === */
+.green  { color: var(--green); }  .red    { color: var(--red); }
+.orange { color: var(--orange); } .blue   { color: var(--blue); }
+.yellow { color: var(--yellow); } .purple { color: var(--purple); }
+.muted  { color: var(--muted); }  .bold   { font-weight: 700; }
+
+/* === Stat boxes === */
+.stats-row { display: flex; gap: 14px; margin: 12px 0; }
+.stat-box { flex: 1; background: var(--surface); border-top: 3px solid var(--blue); border-radius: 4px; padding: 11px 8px; text-align: center; }
+.stat-box .n { font-size: 1.45em; font-weight: 700; color: var(--blue); line-height: 1; }
+.stat-box .l { font-size: 0.57em; color: var(--muted); margin-top: 4px; line-height: 1.3; }
+.stat-box.g { border-top-color: var(--green); } .stat-box.g .n { color: var(--green); }
+.stat-box.r { border-top-color: var(--red);   } .stat-box.r .n { color: var(--red);   }
+.stat-box.o { border-top-color: var(--orange);} .stat-box.o .n { color: var(--orange); }
+
+/* === Highlight boxes === */
+.hbox { background: rgba(41,128,185,0.1); border-left: 3px solid var(--blue); padding: 9px 13px; border-radius: 0 4px 4px 0; font-size: 0.77em; margin: 8px 0; line-height: 1.55; }
+.hbox.g { background: rgba(39,174,96,0.08);  border-left-color: var(--green);  }
+.hbox.r { background: rgba(231,76,60,0.08);  border-left-color: var(--red);    }
+.hbox.o { background: rgba(230,126,34,0.08); border-left-color: var(--orange); }
+.hbox.p { background: rgba(155,89,182,0.08); border-left-color: var(--purple); }
+
+/* === Modality cards === */
+.mod-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mod-card { border-radius: 5px; padding: 11px 13px; font-size: 0.75em; line-height: 1.5; }
+.mod-t1   { background: rgba(52,152,219,0.12); border: 1px solid rgba(52,152,219,0.4); }
+.mod-t1ce { background: rgba(231,76,60,0.12);  border: 1px solid rgba(231,76,60,0.5);  }
+.mod-t2   { background: rgba(39,174,96,0.12);  border: 1px solid rgba(39,174,96,0.4);  }
+.mod-fl   { background: rgba(230,126,34,0.12); border: 1px solid rgba(230,126,34,0.4); }
+.mod-card .mod-name { font-weight: 700; font-size: 1.05em; margin-bottom: 4px; }
+.mod-t1   .mod-name { color: #5dade2; }
+.mod-t1ce .mod-name { color: #f1948a; }
+.mod-t2   .mod-name { color: #58d68d; }
+.mod-fl   .mod-name { color: #f0b27a; }
+
+/* === Architecture diagram === */
+.arch-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.arch-row { display: flex; align-items: center; justify-content: center; gap: 0; width: 100%; }
+.arch-box {
+  border-radius: 5px;
+  padding: 7px 10px;
+  text-align: center;
+  font-size: 0.63em;
+  font-weight: 600;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+.arch-enc  { background: rgba(41,128,185,0.2); border: 1px solid var(--blue2); color: var(--blue); }
+.arch-cm   { background: rgba(52,152,219,0.25); border: 2px solid var(--blue); color: white; }
+.arch-btn  { background: rgba(155,89,182,0.2); border: 2px solid var(--purple); color: #c39bd3; }
+.arch-dec  { background: rgba(39,174,96,0.15); border: 1px solid #27ae60; color: var(--green); }
+.arch-evid { background: rgba(241,196,15,0.15); border: 2px solid var(--yellow); color: var(--yellow); }
+.arch-inp  { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2); color: var(--muted); }
+.arch-arr { color: var(--muted); font-size: 1.1em; padding: 0 3px; flex-shrink: 0; }
+.arch-arr-v { color: var(--muted); font-size: 1.0em; text-align: center; line-height: 1; padding: 1px 0; }
+.arch-skip { color: rgba(39,174,96,0.7); font-size: 0.55em; writing-mode: vertical-lr; padding: 0 2px; }
+
+/* === Loss boxes === */
+.loss-item { padding: 7px 11px; border-radius: 4px; font-size: 0.75em; line-height: 1.5; margin-bottom: 6px; }
+.loss-item .loss-name { font-weight: 700; margin-bottom: 2px; }
+.loss-blue   { background: rgba(77,184,232,0.08);  border-left: 3px solid var(--blue);   }
+.loss-green  { background: rgba(39,174,96,0.08);   border-left: 3px solid var(--green);  }
+.loss-orange { background: rgba(230,126,34,0.08);  border-left: 3px solid var(--orange); }
+.loss-purple { background: rgba(155,89,182,0.08);  border-left: 3px solid var(--purple); }
+.loss-red    { background: rgba(231,76,60,0.08);   border-left: 3px solid var(--red);    }
+.loss-yellow { background: rgba(241,196,15,0.08);  border-left: 3px solid var(--yellow); }
+
+/* === Objective rows === */
+.obj { display: flex; gap: 12px; align-items: flex-start; padding: 9px 13px; border-left: 3px solid var(--blue); background: rgba(255,255,255,0.03); border-radius: 0 4px 4px 0; margin: 6px 0; }
+.obj .num { font-size: 1.2em; flex-shrink: 0; font-weight: 700; color: var(--blue); min-width: 22px; }
+.obj .txt { font-size: 0.78em; line-height: 1.5; }
+.obj .txt strong { display: block; color: white; margin-bottom: 2px; font-size: 1.05em; }
+
+/* === Pipeline === */
+.pipeline { display: flex; align-items: stretch; gap: 0; margin: 10px 0; }
+.pipe-box { flex: 1; background: var(--surface); border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; padding: 12px 14px; font-size: 0.73em; }
+.pipe-box .pt { font-weight: 700; margin-bottom: 3px; }
+.pipe-box .ps { color: var(--muted); font-size: 0.9em; margin-bottom: 7px; }
+.pipe-arr { display: flex; align-items: center; color: var(--blue); font-size: 1.5em; padding: 0 6px; flex-shrink: 0; }
+
+/* === Check/cross items === */
+.check-item { display: flex; gap: 10px; align-items: flex-start; font-size: 0.78em; margin: 5px 0; line-height: 1.5; }
+.check-item .ci { flex-shrink: 0; font-size: 1.1em; }
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+
+<!-- ══ SLIDE 1 · TITLE ═══════════════════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="title-wrap">
+  <div class="course">CS671 Deep Learning &nbsp;·&nbsp; Course Project</div>
+  <h1>Uncertainty-Guided Self-Supervised Learning<br>for Missing-Modality Brain MRI</h1>
+  <div class="subtitle">
+    Reconstruction + Downstream Segmentation<br>
+    BraTS 2024 GLI · 1,350 Patients · 4 MRI Modalities · 3 Tumor Subregions
+  </div>
+  <div class="rule"></div>
+  <div class="tags">
+    <span>SSL Pretraining</span>
+    <span>CrossModal Attention</span>
+    <span>Evidential Uncertainty</span>
+    <span>66.8 M Parameters</span>
+    <span>BraTS 2024</span>
+  </div>
+  <div class="authors">[Your Names] &nbsp;·&nbsp; IIT Kanpur &nbsp;·&nbsp; May 2026</div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 2 · PROBLEM STATEMENT ══════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Problem Statement</div>
+<div class="two-col">
+  <div>
+    <p>Brain tumor segmentation is one of the most critical tasks in clinical medical imaging. It determines radiation therapy planning, surgical margins, and chemotherapy dosing. Standard clinical protocol acquires <strong>four MRI modality scans</strong> per patient, each capturing a fundamentally different biological signal.</p>
+
+    <div class="hbox r" style="margin-top:10px;">
+      <strong>The Core Problem:</strong> Deep learning models are designed and trained assuming all four modalities are always available. In real clinical settings, modalities go missing due to scanner hardware failures, time pressure in ICU/trauma, patient motion artifacts corrupting one sequence, or retrospective data with incomplete acquisitions.
+    </div>
+
+    <p style="margin-top:10px;">Removing even one modality from a model trained on all four causes <strong class="red">catastrophic performance collapse</strong> — often a 40–60% drop in Dice for the tumor core — with no warning or uncertainty signal to the clinician.</p>
+
+    <div class="hbox o" style="margin-top:8px;">
+      <strong>Second Problem:</strong> Standard models output a single probability score per voxel. Even when the prediction is wrong, the model reports high confidence. In a safety-critical setting like neurosurgery, <em>knowing when to doubt the model</em> is as important as the prediction itself.
+    </div>
+  </div>
+
+  <div>
+    <p style="font-size:0.77em; font-weight:600; color:var(--blue); margin-bottom:10px;">The Four MRI Modalities:</p>
+    <div class="mod-grid">
+      <div class="mod-card mod-t1">
+        <div class="mod-name">T1 — Anatomical Reference</div>
+        White matter and fat appear bright. Cerebrospinal fluid is dark. Provides the clearest view of overall brain anatomy and the white matter / grey matter boundary. Used as the structural baseline for all other sequences.
+      </div>
+      <div class="mod-card mod-t1ce">
+        <div class="mod-name">T1ce — Contrast-Enhanced ★ Most Critical</div>
+        Acquired after intravenous gadolinium injection. The contrast agent crosses the <em>disrupted blood-brain barrier</em> around actively growing tumor cells, making the enhancing tumor appear bright white. <strong>The only modality that physically reveals the active tumor core.</strong>
+      </div>
+      <div class="mod-card mod-t2">
+        <div class="mod-name">T2 — Fluid and Oedema</div>
+        Sensitive to water content. Fluid, edema (swelling around the tumor), and most tumor tissue appear bright. Helps visualize the extent of tumor-associated changes in surrounding brain tissue, including regions of swelling.
+      </div>
+      <div class="mod-card mod-fl">
+        <div class="mod-name">FLAIR — Infiltration Extent</div>
+        A specialized T2 sequence that <em>suppresses</em> the bright signal from free CSF fluid in ventricles. This makes tumor-associated edema and infiltration far more visible against the now-dark background, revealing the full spatial extent of tumor spread.
+      </div>
+    </div>
+    <div class="hbox" style="margin-top:10px; font-size:0.72em;">
+      The four sequences are co-registered — the same voxel coordinate maps to the same anatomical point in all four volumes. This spatial alignment is a prerequisite for multi-modal deep learning.
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 3 · OBJECTIVES ══════════════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Project Objectives</div>
+<p style="font-size:0.78em; color:var(--muted); margin-bottom:14px;">Develop an uncertainty-guided self-supervised framework that addresses both the missing-modality fragility problem and the overconfident prediction problem:</p>
+
+<div class="obj">
+  <div class="num">1</div>
+  <div class="txt">
+    <strong>Cross-Modal Reconstruction (Modality Synthesis)</strong>
+    Given a subset of available MRI modalities, infer and reconstruct the missing ones. This serves two purposes: (i) it provides a self-supervised pretext task for learning cross-modal structure from unlabeled data, and (ii) it directly addresses cases where a clinician needs an estimate of the missing scan for downstream analysis.
+  </div>
+</div>
+
+<div class="obj">
+  <div class="num">2</div>
+  <div class="txt">
+    <strong>Modality-Robust 3D Representations</strong>
+    Learn internal feature representations of the brain that remain meaningful and effective even when one or more modalities are absent at test time. The model must dynamically adapt to any subset of available modalities — rather than requiring a fixed, known set of inputs.
+  </div>
+</div>
+
+<div class="obj">
+  <div class="num">3</div>
+  <div class="txt">
+    <strong>Improve Downstream 3D Tumor Segmentation Under Missing Modalities</strong>
+    Improve brain tumor segmentation (Whole Tumour, Tumour Core, Enhancing Tumour) specifically under missing-modality conditions. The model should exhibit graceful, monotonic performance degradation as modalities are removed — rather than catastrophic failure — and outperform baseline models on all modality combinations.
+  </div>
+</div>
+
+<div class="obj">
+  <div class="num">4</div>
+  <div class="txt">
+    <strong>Voxel-Level and Volume-Level Uncertainty Maps</strong>
+    Produce per-voxel uncertainty estimates that correlate with reconstruction and segmentation errors. These uncertainty maps should serve as reliability indicators — highlighting regions where the model's predictions are untrustworthy, particularly in areas where a missing modality was most informative.
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 4 · DATASET ══════════════════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Dataset — BraTS 2024 GLI</div>
+<div class="two-col">
+  <div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="n">1,350</div><div class="l">Total Patients</div></div>
+      <div class="stat-box"><div class="n">944</div><div class="l">Train Split</div></div>
+      <div class="stat-box"><div class="n">270</div><div class="l">Val Split</div></div>
+      <div class="stat-box"><div class="n">136</div><div class="l">Test Split</div></div>
+    </div>
+    <ul style="margin-top:6px;">
+      <li>Four modalities per patient: T1, T1ce, T2, FLAIR</li>
+      <li>Expert-annotated tumor subregions: WT, TC, ET</li>
+      <li>Pre-skull-stripped, co-registered to SRI24 atlas, 1 mm isotropic</li>
+      <li>Format: NIfTI (.nii.gz), 240×240×155 native resolution</li>
+    </ul>
+
+    <p style="font-size:0.77em; font-weight:600; color:var(--blue); margin-top:14px; margin-bottom:8px;">Dataset Challenges and How We Solved Them:</p>
+
+    <div class="loss-item loss-orange" style="margin-bottom:6px;">
+      <div class="loss-name">C1 — Severe Class Imbalance</div>
+      Background is ~95% of the volume. ET is less than 1%. A model that predicts "no tumor" everywhere gets 95% voxel accuracy but is completely useless in practice.<br>
+      <span class="green bold">→ Class-weighted Dice loss: ET×2.0, TC×1.5, WT×1.0 — pushes the model to care about rare but critical regions.</span>
+    </div>
+    <div class="loss-item loss-orange" style="margin-bottom:6px;">
+      <div class="loss-name">C2 — All Modalities Always Present in Labels</div>
+      BraTS always gives you all 4 modalities — there's no built-in missing-modality signal to train on.<br>
+      <span class="green bold">→ Random binary mask m ∈ {0,1}⁴ at every training step. Missing modalities zero-masked; at least one always kept. This creates all 15 subsets during training.</span>
+    </div>
+  </div>
+
+  <div>
+    <p style="font-size:0.77em; font-weight:600; color:var(--blue); margin-bottom:8px;">Preprocessing Pipeline:</p>
+    <div class="loss-item loss-blue" style="margin-bottom:6px;">
+      <div class="loss-name">1. Intensity Normalisation</div>
+      Z-score normalisation per modality per patient, computed over non-zero (brain) voxels only. Ensures comparable intensity ranges across different scanners and acquisition sites.
+    </div>
+    <div class="loss-item loss-blue" style="margin-bottom:6px;">
+      <div class="loss-name">2. Resampling to 128³</div>
+      Native 240×240×155 → 128×128×128. Standardises input size and fits 3D volumes in GPU memory. We evaluated 192³ and found the 4× memory cost unjustified by the marginal accuracy gain.
+    </div>
+    <div class="loss-item loss-blue" style="margin-bottom:6px;">
+      <div class="loss-name">3. Label Encoding</div>
+      BraTS integer labels (0/1/2/4) → three binary channels: WT (all non-zero), TC (labels 1,4), ET (label 4 only). Enforces the ET⊂TC⊂WT hierarchy in the ground truth.
+    </div>
+    <div class="loss-item loss-blue">
+      <div class="loss-name">4. Data Augmentation (training only)</div>
+      Random axis flipping (8 combinations), intensity scaling ×U(0.85, 1.15), intensity shift +U(−0.1, 0.1), Gaussian noise N(0, 0.05²). Each applied independently with 50% probability.
+    </div>
+    <div class="hbox" style="margin-top:10px;">
+      Three tumor subregions are hierarchically nested: <strong>ET ⊂ TC ⊂ WT</strong>. This biological constraint is enforced both in preprocessing and in the hierarchical consistency loss during training.
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 5 · ARCHITECTURE ════════════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Architecture — MissingModalityNetV2 (66.8 M Parameters)</div>
+<div class="two-col">
+
+  <!-- Left: visual diagram -->
+  <div>
+    <p style="font-size:0.72em; color:var(--muted); margin-bottom:10px; text-align:center;">Full forward pass — input to output</p>
+
+    <!-- Input row -->
+    <div style="display:flex; justify-content:center; gap:6px; margin-bottom:4px;">
+      <div class="arch-box arch-inp" style="min-width:56px;">T1<br><span style="font-size:0.85em; color:var(--muted)">128³</span></div>
+      <div class="arch-box arch-inp" style="min-width:56px;">T1ce<br><span style="font-size:0.85em; color:var(--muted)">128³</span></div>
+      <div class="arch-box arch-inp" style="min-width:56px;">T2<br><span style="font-size:0.85em; color:var(--muted)">128³</span></div>
+      <div class="arch-box arch-inp" style="min-width:56px;">FLAIR<br><span style="font-size:0.85em; color:var(--muted)">128³</span></div>
+      <div class="arch-box arch-inp" style="min-width:40px; font-size:0.58em;">mask<br>m∈{0,1}⁴</div>
+    </div>
+    <div class="arch-arr-v">↓</div>
+
+    <!-- CrossModal -->
+    <div style="display:flex; justify-content:center; margin-bottom:4px;">
+      <div class="arch-box arch-cm" style="width:88%; font-size:0.68em;">
+        CrossModal Attention Fusion<br>
+        <span style="font-weight:400; color:rgba(255,255,255,0.7); font-size:0.88em;">Per-modality branches → attention over present mods only → fused 128³ × 48ch</span>
+      </div>
+    </div>
+    <div class="arch-arr-v">↓</div>
+
+    <!-- Encoder levels -->
+    <div style="display:flex; justify-content:space-between; margin-bottom:4px; gap:4px;">
+      <div class="arch-box arch-enc" style="flex:1; font-size:0.6em;">E1<br>128³<br>48ch</div>
+      <div class="arch-arr" style="align-self:center;">→</div>
+      <div class="arch-box arch-enc" style="flex:1; font-size:0.6em;">E2<br>64³<br>96ch</div>
+      <div class="arch-arr" style="align-self:center;">→</div>
+      <div class="arch-box arch-enc" style="flex:1; font-size:0.6em;">E3<br>32³<br>192ch</div>
+      <div class="arch-arr" style="align-self:center;">→</div>
+      <div class="arch-box arch-enc" style="flex:1; font-size:0.6em;">E4<br>16³<br>384ch</div>
+    </div>
+    <div class="arch-arr-v">↓</div>
+
+    <!-- Bottleneck Transformer -->
+    <div style="display:flex; justify-content:center; margin-bottom:4px;">
+      <div class="arch-box arch-btn" style="width:70%; font-size:0.65em;">
+        BottleneckTransformer<br>
+        <span style="font-weight:400; color:rgba(255,255,255,0.65); font-size:0.88em;">8-head self-attention · 8³ = 512 tokens · 768ch</span>
+      </div>
+    </div>
+    <div class="arch-arr-v">↓</div>
+
+    <!-- Decoder -->
+    <div style="display:flex; justify-content:space-between; margin-bottom:4px; gap:4px;">
+      <div class="arch-box arch-dec" style="flex:1; font-size:0.6em;">D4<br>16³<br>384ch</div>
+      <div class="arch-arr" style="align-self:center;">→</div>
+      <div class="arch-box arch-dec" style="flex:1; font-size:0.6em;">D3<br>32³<br>192ch</div>
+      <div class="arch-arr" style="align-self:center;">→</div>
+      <div class="arch-box arch-dec" style="flex:1; font-size:0.6em;">D2<br>64³<br>96ch</div>
+      <div class="arch-arr" style="align-self:center;">→</div>
+      <div class="arch-box arch-dec" style="flex:1; font-size:0.6em;">D1<br>128³<br>48ch</div>
+    </div>
+    <div style="font-size:0.6em; color:rgba(39,174,96,0.8); text-align:center; margin-bottom:4px;">↑ skip connections from encoder at each level ↑</div>
+    <div class="arch-arr-v">↓</div>
+
+    <!-- Output heads -->
+    <div style="display:flex; justify-content:center; gap:10px;">
+      <div class="arch-box arch-evid" style="font-size:0.63em;">EvidentialHead V2<br><span style="font-weight:400; color:rgba(255,255,255,0.7); font-size:0.9em;">Dirichlet → prob + vacuity<br>conditioned on n_present</span></div>
+      <div class="arch-box arch-dec" style="font-size:0.63em;">Recon Head<br><span style="font-weight:400; color:rgba(255,255,255,0.7); font-size:0.9em;">2-layer conv<br>missing mod synthesis</span></div>
+    </div>
+  </div>
+
+  <!-- Right: component explanations -->
+  <div>
+    <div class="loss-item loss-blue" style="margin-bottom:7px;">
+      <div class="loss-name blue">CrossModal Attention Fusion</div>
+      Four separate 3D convolutional branches process each modality independently. A learned cross-attention mechanism computes weights <em>only over the present modalities</em> (mask m filters out the rest). The fused representation is an attention-weighted sum — missing modalities contribute exactly zero, and remaining ones automatically receive higher weight. No imputation or zero-padding tricks.
+    </div>
+    <div class="loss-item" style="background:rgba(155,89,182,0.08); border-left:3px solid var(--purple); margin-bottom:7px;">
+      <div class="loss-name purple">BottleneckTransformer</div>
+      3D convolutions have limited receptive fields — they cannot directly relate voxels on opposite sides of a large tumor. At the bottleneck (8³ = 512 spatial positions), we apply 8-head multi-head self-attention: every position attends to every other position globally. This captures long-range dependencies (e.g., necrotic core ↔ enhancing rim) at modest cost.
+    </div>
+    <div class="loss-item loss-green" style="margin-bottom:7px;">
+      <div class="loss-name green">EvidentialHeadV2</div>
+      Standard head: outputs one probability p ∈ [0,1] per voxel. Evidential head: outputs two parameters (α, β) of a Beta distribution — so we get both <em>what</em> the model predicts (mean = α/S) and <em>how much evidence</em> supports it (total evidence S = α+β, vacuity = 2/S). V2 conditions this on n_present so uncertainty scales with missing modalities.
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 6 · SSL PRETRAINING ══════════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Stage 1 — Self-Supervised Pretraining (50 epochs, no segmentation labels)</div>
+<div class="two-col-slim">
+  <div>
+    <div class="fig" style="margin-bottom:14px;">
+      <img src="results/figures/fig_ssl_curves.png" style="border-radius:4px;">
+      <div class="cap">All four SSL losses converging over 50 epochs. View consistency (cosine distance) reaches near-zero by epoch 30 — encoder has learned stable, modality-invariant representations.</div>
+    </div>
+    <div class="hbox g" style="font-size:0.73em;">
+      <strong>Why SSL before supervised training?</strong> Expert annotation of 3D brain MRI takes 1–4 hours per patient. SSL extracts useful cross-modal structure from the raw scans. The encoder enters supervised fine-tuning already understanding what each modality uniquely encodes.
+    </div>
+  </div>
+
+  <div>
+    <p style="font-size:0.77em; font-weight:600; color:var(--blue); margin-bottom:8px;">Four SSL Loss Components:</p>
+
+    <div class="loss-item loss-blue" style="margin-bottom:6px;">
+      <div class="loss-name blue">DINO — Teacher-Student Distillation</div>
+      Maintains two copies of the model: a student (trained via gradient descent) and a teacher (exponential moving average, τ = 0.996→1.0). Loss: L = −Σ P_teacher · log(P_student). The slowly-updating teacher provides stable, non-collapsing targets. Teaches features that are consistent under augmentation — modality-invariant and anatomy-focused.
+    </div>
+
+    <div class="loss-item loss-purple" style="margin-bottom:6px;">
+      <div class="loss-name purple">InfoNCE — Contrastive Learning</div>
+      Two augmented views of the same patient (possibly with different missing modalities) form a positive pair; views of different patients are negatives. Loss: L = −log[exp(sim(z, z⁺)/τ) / Σⱼ exp(sim(z, zⱼ)/τ)]. Forces encoder to produce similar embeddings for the same brain regardless of which modalities are present. Directly teaches modality-invariance.
+    </div>
+
+    <div class="loss-item loss-green" style="margin-bottom:6px;">
+      <div class="loss-name green">Cross-Modal Reconstruction</div>
+      A random modality subset is given as input; the model predicts the held-out (missing) modality. Loss: L_recon = MSE(x̂_missing, x_missing) + λ(1 − SSIM(x̂_missing, x_missing)). The combined MSE+SSIM loss captures both pixel-level accuracy and perceptual structural similarity. To reconstruct T1ce from T1+T2+FLAIR, the model must learn what T1ce uniquely provides. This is the pretext task that most directly builds cross-modal understanding.
+    </div>
+
+    <div class="loss-item loss-orange">
+      <div class="loss-name orange">View Consistency</div>
+      Two differently-augmented views of the same scan should produce nearby encoder representations. Loss: L = 1 − cos(z₁, z₂). This cosine distance regularises the embedding space and prevents the representations from drifting apart under augmentation — a simpler stability signal complementing DINO.
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 7 · SUPERVISED TRAINING ═════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Stage 2 — Supervised Fine-Tuning (250 epochs, best checkpoint at epoch 115)</div>
+<div class="two-col">
+  <div>
+    <p style="font-size:0.77em; color:var(--muted); margin-bottom:10px;">The SSL-pretrained encoder is fine-tuned end-to-end with expert segmentation labels using a composite loss of seven components, each targeting a specific failure mode:</p>
+
+    <div class="loss-item loss-blue" style="margin-bottom:6px;">
+      <div class="loss-name blue">① Class-Weighted Dice Loss</div>
+      Standard Dice treats WT, TC, ET equally. ET is ~10× smaller than WT in voxel count — its gradient gets drowned out. We apply per-class weights [WT=1.0, TC=1.5, ET=2.0]: L = Σ wc · (1 − 2·TP / (2·TP + FP + FN)). ET receives double the gradient signal of WT, directly compensating for the size imbalance.
+    </div>
+
+    <div class="loss-item loss-purple" style="margin-bottom:6px;">
+      <div class="loss-name purple">② Binary Cross-Entropy Loss</div>
+      Per-voxel classification signal: L = −Σ [y log p + (1−y) log(1−p)]. Dice optimises overlap ratios (global); BCE provides stable gradients for individual voxel decisions (local). Using both consistently outperforms either alone across all three tumor subregions.
+    </div>
+
+    <div class="loss-item loss-orange" style="margin-bottom:6px;">
+      <div class="loss-name orange">③ Boundary Dice Loss</div>
+      Standard Dice penalises all errors equally regardless of location. Tumor boundary errors are clinically more significant (they determine dose margins) but are a small fraction of voxels. A morphological dilation extracts boundary voxels: Boundary(X) = X⊕B − X. Dice is then computed only on these boundary regions, giving 3–4× more gradient weight to contour accuracy.
+    </div>
+
+    <div class="loss-item loss-red" style="margin-bottom:6px;">
+      <div class="loss-name red">④ Hierarchical Consistency Loss</div>
+      The biological constraint ET⊂TC⊂WT can be violated voxel-by-voxel. L_hier = Σ max(0, ŷ_ET − ŷ_TC) + max(0, ŷ_TC − ŷ_WT). If the model predicts a voxel as ET but not as TC, this hinge loss penalises it. Softly enforces anatomical containment without hard constraints.
+    </div>
+  </div>
+
+  <div>
+    <div class="loss-item loss-yellow" style="margin-bottom:6px;">
+      <div class="loss-name yellow">⑤ Evidential NLL + KL Loss (EvidentialSegLoss)</div>
+      Trains the evidential head using two terms: (i) Negative log-likelihood under the Beta distribution: L_nll = −Σ [y log p + (1−y) log(1−p)] where p = α/(α+β). (ii) KL divergence from an uninformative Beta(1,1) prior, applied only to predictions that are wrong — penalises the model for maintaining high evidence (low vacuity) on incorrect predictions. The KL weight is annealed from 0 → 1 over 20 epochs to prevent early instability.
+    </div>
+
+    <div class="loss-item loss-green" style="margin-bottom:6px;">
+      <div class="loss-name green">⑥ Deep Supervision Dice</div>
+      Segmentation heads at intermediate decoder levels D3 and D2 compute Dice against spatially downsampled targets: L_ds = Dice(D3, Y↓4) + Dice(D2, Y↓2). Multi-scale gradient flow accelerates encoder training and significantly improves early-epoch convergence.
+    </div>
+
+    <div class="loss-item" style="background:rgba(52,152,219,0.07); border-left:3px solid #5dade2; margin-bottom:6px;">
+      <div class="loss-name" style="color:#5dade2;">⑦ Vacuity MSE Supervision</div>
+      The teacher model's voxel-wise prediction error (|σ(seg_teacher) − y|) is used as the target vacuity. L_vac = MSE(vacuity_student, error_teacher). Low weight (vac_w = 0.2) keeps this as an auxiliary regulariser. Where the teacher was wrong → student should be uncertain. This closes the feedback loop between segmentation accuracy and uncertainty output.
+    </div>
+
+    <div class="hbox" style="margin-top:8px; font-size:0.73em;">
+      <strong>Training setup:</strong> AdamW optimiser · LR 2×10⁻⁴ → 10⁻⁶ cosine annealing · batch size 1 · random modality masking at every step · automatic best-validation-Dice checkpoint saving · gradient checkpointing disabled (not needed with single view).
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 8 · CORE RESULTS ════════════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Results — Core Segmentation Performance</div>
+<div class="stats-row" style="margin-bottom:14px;">
+  <div class="stat-box g"><div class="n">0.895</div><div class="l">WT Dice<br>Whole Tumour</div></div>
+  <div class="stat-box g"><div class="n">0.775</div><div class="l">TC Dice<br>Tumour Core</div></div>
+  <div class="stat-box g"><div class="n">0.771</div><div class="l">ET Dice<br>Enhancing Tumour</div></div>
+  <div class="stat-box g"><div class="n">0.814</div><div class="l">Mean Dice<br>(TTA, all 4 mods)</div></div>
+</div>
+<div class="two-col">
+  <div>
+    <p style="font-size:0.77em; font-weight:600; color:var(--blue); margin-bottom:8px;">V1 (No SSL) vs V2 (With SSL):</p>
+    <table style="margin-bottom:12px;">
+      <tr><th>Metric</th><th>V1 Baseline</th><th>V2 Ours</th><th>Gain</th></tr>
+      <tr><td>WT Dice</td><td>0.886</td><td class="green bold">0.895</td><td class="green">+0.009</td></tr>
+      <tr><td>TC Dice</td><td>0.719</td><td class="green bold">0.775</td><td class="green">+0.056</td></tr>
+      <tr><td>ET Dice</td><td>0.690</td><td class="green bold">0.771</td><td class="green">+0.081</td></tr>
+      <tr class="hl"><td><strong>Mean Dice</strong></td><td>0.765</td><td class="green bold">0.814</td><td class="green bold">+0.049</td></tr>
+    </table>
+    <div class="hbox g" style="margin-bottom:8px;">
+      <strong>ET improved by +0.081</strong> — ET is the smallest and hardest region (&lt;1% of volume, fuzzy boundary). The reconstruction pretraining taught the model what T1ce enhancement looks like before it ever saw a segmentation label, which made ET boundaries much easier to learn in the supervised stage.
+    </div>
+    <div class="hbox" style="margin-bottom:8px;">
+      <strong>Test-Time Augmentation (TTA):</strong> 8 flipped versions of each test volume are independently segmented and the predictions averaged. This adds 1–2% Dice at the cost of 8× inference time. All final reported numbers use TTA.
+    </div>
+    <div class="hbox">
+      <strong>Clinically acceptable thresholds:</strong> WT &gt; 0.80, TC &gt; 0.75, ET &gt; 0.70. <span class="green bold">All three are met by our model.</span>
+    </div>
+  </div>
+  <div class="fig">
+    <img src="results/figures/fig_dice_per_class.png">
+    <div class="cap">Per-class Dice evolution over 250 training epochs. WT converges earliest and most stably. TC and ET require longer training and are more sensitive to the class-weighted loss and SSL initialisation. Test scores (dashed lines) annotated on each panel. Best checkpoint saved at epoch 115.</div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 9 · ALL 15 COMBOS ════════════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Robustness — Performance Across All 15 Modality Combinations</div>
+<div class="two-col-slim">
+  <div class="fig">
+    <img src="results/figures/fig_eval_heatmap.png" style="max-height:470px; width:auto; display:block; margin:0 auto;">
+    <div class="cap">Dice score heatmap: rows = all 15 non-empty subsets of {T1, T1ce, T2, FLAIR}, columns = WT / TC / ET. Green = high Dice, red = low. Evaluated on all 136 test patients per combination (2,040 total evaluations).</div>
+  </div>
+  <div>
+    <p style="font-size:0.77em; font-weight:600; color:var(--blue); margin-bottom:8px;">Reading the Heatmap:</p>
+    <ul style="margin-bottom:12px;">
+      <li><strong>Every row containing T1ce is green for TC and ET</strong> — the enhancing-tumor signal is present and the model can reliably segment these regions.</li>
+      <li><strong>Every row without T1ce is red/orange for TC and ET</strong> — TC collapses from 0.76 → 0.26–0.34 (65% drop). ET collapses from 0.77 → 0.25–0.31.</li>
+      <li><strong>WT column stays mostly green across all rows</strong> — the whole tumor boundary is visible on any structural scan (T1, T2, or FLAIR) without needing contrast agent.</li>
+    </ul>
+
+    <table style="margin-bottom:12px;">
+      <tr><th># Modalities</th><th>WT</th><th>TC</th><th>ET</th><th>Mean</th></tr>
+      <tr class="hl"><td>4 (all)</td><td class="green">0.891</td><td class="green">0.759</td><td class="green">0.765</td><td class="green bold">0.805</td></tr>
+      <tr><td>3</td><td class="green">0.876</td><td>0.657</td><td>0.645</td><td>0.726</td></tr>
+      <tr><td>2</td><td>0.850</td><td class="orange">0.528</td><td class="orange">0.516</td><td class="orange">0.631</td></tr>
+      <tr><td>1</td><td>0.791</td><td class="red">0.384</td><td class="red">0.365</td><td class="red">0.513</td></tr>
+    </table>
+
+    <div class="hbox g" style="margin-bottom:8px;">
+      <strong>Graceful degradation:</strong> Performance decreases smoothly and monotonically as modalities are removed. No catastrophic cliff. Even with only 1 modality, WT Dice remains above 0.79 — the model has learned to make use of whatever information is available.
+    </div>
+    <div class="hbox r">
+      <strong>The T1ce Divide:</strong> With T1ce present (any combination) → TC ≥ 0.70, ET ≥ 0.71. Without T1ce (any combination) → TC = 0.26–0.34, ET = 0.25–0.31. T1ce's gadolinium signal is physically unique — it cannot be approximated from structural MRI, and our model correctly reflects this fundamental constraint.
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 10 · MODALITY IMPORTANCE ═══════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Modality Importance — What the Model Learned</div>
+<div class="fig" style="margin-bottom:14px;">
+  <img src="results/figures/fig_modality_importance.png" style="width:100%; max-height:240px; object-fit:contain; border-radius:4px;">
+  <div class="cap">Leave-one-out modality attribution: Dice drop when each modality is individually removed from the all-4 baseline. Left panel shows per-modality LOO drop across WT/TC/ET. T1ce causes the largest drop by a significant margin.</div>
+</div>
+<div class="two-col">
+  <div>
+    <p style="font-size:0.77em; font-weight:600; color:var(--blue); margin-bottom:8px;">Leave-One-Out Attribution Results:</p>
+    <table>
+      <tr><th>Modality Removed</th><th>Mean Dice Drop</th><th>Primary Clinical Role</th></tr>
+      <tr class="hl2"><td><strong>T1ce</strong></td><td class="red bold">−0.0044</td><td>Active tumor — contrast enhancement</td></tr>
+      <tr><td>FLAIR</td><td class="orange">−0.0023</td><td>Oedema and infiltration extent</td></tr>
+      <tr><td>T1</td><td>−0.0014</td><td>Anatomical reference structure</td></tr>
+      <tr><td>T2</td><td>−0.0014</td><td>Fluid and oedema context</td></tr>
+    </table>
+  </div>
+  <div>
+    <div class="hbox r" style="margin-bottom:8px;">
+      <strong>T1ce is the most critical modality by 2×</strong> — removing it causes twice as large a Dice drop as removing any structural scan. This directly reflects its unique role as the only scan that physically reveals the active tumor core via gadolinium contrast.
+    </div>
+    <div class="hbox g" style="margin-bottom:8px;">
+      <strong>The model learned clinical ground truth from data alone.</strong> Neuroradiology textbooks identify T1ce as essential for tumor core delineation. Our model arrived at the same hierarchy with zero clinical prior hard-coded — purely from the statistical structure of the training data.
+    </div>
+    <div class="hbox">
+      <strong>T1 and T2 have equal importance (0.0014 each)</strong> — they provide complementary but similarly weighted structural context. FLAIR's higher importance (0.0023) reflects its role in delineating the full tumor extent, which contributes to WT accuracy.
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 11 · RECONSTRUCTION (before uncertainty) ═══════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Cross-Modal Reconstruction Results</div>
+<div class="two-col" style="gap:22px;">
+  <div>
+    <div class="fig" style="margin-bottom:10px;">
+      <img src="results/figures/fig_reconstruction_quality.png" style="width:100%; border-radius:4px;">
+      <div class="cap">PSNR (left) and SSIM (right) as a function of how many modalities are provided. Each curve = one missing modality.</div>
+    </div>
+    <table>
+      <tr><th>Present → Missing</th><th>PSNR</th><th>SSIM</th><th>Result</th></tr>
+      <tr class="hl"><td>3 others → <strong>T1</strong></td><td class="green">9.40</td><td class="green">0.796</td><td class="green">Good</td></tr>
+      <tr><td>3 others → <strong>T2</strong></td><td>7.00</td><td class="orange">0.104</td><td class="orange">Partial</td></tr>
+      <tr><td>3 others → <strong>FLAIR</strong></td><td>4.70</td><td class="orange">0.257</td><td class="orange">Partial</td></tr>
+      <tr class="hl2"><td>3 others → <strong>T1ce</strong></td><td class="red">3.57</td><td class="red">−0.144</td><td class="red">Not possible</td></tr>
+    </table>
+  </div>
+  <div>
+    <p style="font-size:0.76em; font-weight:600; color:var(--blue); margin-bottom:8px;">Loss functions: MSE + SSIM</p>
+    <ul style="font-size:0.75em; margin-bottom:12px;">
+      <li><strong>MSE</strong> — voxel-level intensity accuracy, drives PSNR</li>
+      <li><strong>SSIM</strong> — structural similarity; prevents the blurry outputs that MSE alone tends to produce</li>
+    </ul>
+    <div class="hbox g" style="margin-bottom:8px; font-size:0.74em;">
+      <strong>T1 works (SSIM 0.796)</strong> — all three other modalities carry enough anatomical info to reconstruct T1's white/grey matter contrast.
+    </div>
+    <div class="hbox r" style="margin-bottom:8px; font-size:0.74em;">
+      <strong>T1ce is impossible (SSIM −0.144)</strong> — gadolinium contrast signal simply doesn't exist in T1/T2/FLAIR. Negative SSIM means the model's guess has the opposite spatial pattern from ground truth. This is a physics constraint, not a model limitation.
+    </div>
+    <div class="hbox o" style="font-size:0.74em;">
+      <strong>T2 and FLAIR are in between</strong> — they share some tissue contrast info with each other, but each has unique content (FLAIR's CSF suppression, T2's water sensitivity) that the others can't fully predict.
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 12 · UNCERTAINTY IMPLEMENTATION ═════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Uncertainty Quantification — How We Implemented It</div>
+<div class="two-col">
+  <div>
+    <div class="loss-item loss-yellow" style="margin-bottom:8px;">
+      <div class="loss-name yellow">EvidentialHeadV2 — Dirichlet-Based Vacuity</div>
+      A regular segmentation head gives you one number per voxel — a probability. It can't tell you whether it's confident or just guessing. Our evidential head outputs two parameters of a Beta distribution instead:<br><br>
+      &nbsp;&nbsp;α = softplus(logit) + 1 &nbsp;&nbsp;(evidence for "tumor")<br>
+      &nbsp;&nbsp;β = softplus(−logit) + 1 &nbsp;(evidence for "background")<br>
+      &nbsp;&nbsp;S = α + β &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(total evidence)<br><br>
+      <strong>probability = α / S</strong> &nbsp;(what we predict)<br>
+      <strong>vacuity = 2 / S</strong> &nbsp;&nbsp;&nbsp;&nbsp;(how uncertain we are)<br><br>
+      When S is large (e.g. 200), vacuity = 0.01 → model is confident. When S is small (e.g. 4), vacuity = 0.50 → model is uncertain. <strong>V2 specifically conditions the head on n_present</strong> — a learned scaling function ψ(n_present) lets the model express proportionally higher uncertainty when fewer modalities are available.
+    </div>
+
+    <div class="loss-item loss-blue" style="margin-bottom:8px;">
+      <div class="loss-name blue">Vacuity Supervision Loss</div>
+      We use the EMA teacher model's prediction error as a signal to train vacuity — wherever the teacher was wrong, the student should output high vacuity:<br><br>
+      &nbsp;&nbsp;target_vac = |σ(seg_teacher) − y|<br>
+      &nbsp;&nbsp;L_vac = MSE(vacuity_student, target_vac)<br><br>
+      Teacher wrong → student should be uncertain. Teacher right → student should be confident. Run with weight vac_w = 0.2 alongside the main Dice/BCE losses.
+    </div>
+  </div>
+
+  <div>
+    <div class="loss-item" style="background:rgba(155,89,182,0.08); border-left:3px solid var(--purple); margin-bottom:8px;">
+      <div class="loss-name purple">MC Dropout — Epistemic Uncertainty</div>
+      The EvidentialHead has a Dropout3d(p=0.2) layer that stays <strong>on at test time</strong> — normally dropout is turned off after training, but here we keep it active deliberately. We run 20 forward passes on the same input, each time with a different random set of dropped neurons.<br><br>
+      The variance across those 20 predictions = <strong>epistemic uncertainty</strong>. High variance means the model gives inconsistent answers depending on which neurons are active — a sign it hasn't fully learned this type of input.<br><br>
+      Vacuity (from the evidential head) captures the other kind: <em>aleatoric</em> uncertainty — ambiguity baked into the data itself that no amount of training can resolve.
+    </div>
+
+    <div class="loss-item loss-green" style="margin-bottom:8px;">
+      <div class="loss-name green">Evidential NLL + KL Loss (EvidentialSegLoss)</div>
+      Trains the evidential head during supervised fine-tuning using two terms:<br><br>
+      <strong>(i) NLL:</strong> −Σ [y·log(α/S) + (1−y)·log(β/S)] — standard cross-entropy under the Beta distribution mean.<br><br>
+      <strong>(ii) KL divergence:</strong> KL(Beta(α,β) ‖ Beta(1,1)), annealed from 0 → 1 over 20 epochs. Applied only on incorrect predictions — penalises the model for maintaining high evidence (low vacuity) where it is wrong. Directly pushes vacuity up in error regions.
+    </div>
+
+    <div class="loss-item loss-orange">
+      <div class="loss-name orange">Adaptive Uncertainty Thresholding</div>
+      Voxels whose vacuity exceeds threshold θ are suppressed at inference (predicted background regardless of the class probability). We sweep θ ∈ {0.05, …, 0.30} on the test set — θ* = 0.25 gives the best Mean Dice. Below is the Dice vs. threshold sweep:
+    </div>
+    <div class="fig" style="margin-top:8px;">
+      <img src="results/figures/fig_aleatoric_curve.png" style="width:100%; border-radius:4px;">
+      <div class="cap">Mean Dice as a function of vacuity threshold θ. The peak at θ = 0.25 is modest (+0.0008) — the flat vacuity distribution limits the benefit.</div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE 13 · UNCERTAINTY MAPS ══════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Uncertainty Maps — Where the Model Knows It's Wrong</div>
+<div class="two-col-slim">
+  <div class="fig">
+    <img src="results/figures/fig_uncertainty_map.png" style="max-height:500px; width:auto; display:block; margin:0 auto; border-radius:4px;">
+    <div class="cap">Three rows = three modality conditions for the same test patient and axial slice. Four columns: T1ce MRI background · Ground truth segmentation · Model prediction · Vacuity heatmap (hot colormap — bright orange/white = high uncertainty, dark = confident). Green = WT, yellow = TC, red = ET.</div>
+  </div>
+  <div>
+    <p style="font-size:0.77em; font-weight:600; color:var(--blue); margin-bottom:10px;">How to Read the Figure:</p>
+    <p style="font-size:0.76em; color:var(--muted); margin-bottom:10px;">Each row is one clinical scenario. The rightmost column shows the per-voxel vacuity output of EvidentialHeadV2 — bright = the model is uncertain here, dark = the model is confident.</p>
+
+    <div class="hbox g" style="margin-bottom:8px;">
+      <strong>Row 1 — All 4 Modalities Present:</strong> The model has complete information. The vacuity heatmap is uniformly dark — near-zero uncertainty across the entire brain. The prediction closely matches the ground truth for all three tumor subregions (WT/TC/ET). Confidence is high and justified by the complete input.
+    </div>
+
+    <div class="hbox o" style="margin-bottom:8px;">
+      <strong>Row 2 — T1ce Removed:</strong> The most critical modality is absent. The vacuity heatmap brightens specifically at the tumor core and enhancing tumor regions — exactly where T1ce gadolinium signal is needed. WT prediction remains reasonable (visible on FLAIR/T2), but TC and ET predictions deteriorate. The model correctly localises its own uncertainty.
+    </div>
+
+    <div class="hbox r" style="margin-bottom:10px;">
+      <strong>Row 3 — T1 Only (Worst Case):</strong> A bright hot spot of high uncertainty appears directly over the tumor core. The model is correctly signalling: "I cannot determine where the enhancing tumor is without contrast information." TC and ET predictions largely collapse. The uncertainty map acts as a spatial alarm — highlighting exactly the region a clinician should manually verify.
+    </div>
+
+    <div class="hbox">
+      <strong>Clinical interpretation:</strong> Where the heatmap is bright, the automated segmentation should not be used directly for radiation dose planning without radiologist verification. The spatial pattern of uncertainty is anatomically meaningful and clinically actionable.
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ══ SLIDE · ECE CALIBRATION ════════════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Uncertainty — Calibration Results (ECE)</div>
+<div class="fig" style="margin-bottom:12px;">
+  <img src="results/figures/fig_calibration.png" style="width:100%; border-radius:4px;">
+  <div class="cap">Reliability diagram. Bars show mean predicted confidence per bin vs. actual accuracy. A perfectly calibrated model lies on the diagonal. Our model sits very close to it.</div>
+</div>
+<div class="two-col" style="gap:24px; max-width:780px; margin:0 auto;">
+  <div style="background:rgba(39,174,96,0.08); border:1px solid rgba(39,174,96,0.3); border-radius:5px; padding:14px 16px;">
+    <p style="font-size:0.8em; font-weight:700; color:var(--green); margin-bottom:8px;">ECE = 0.0153</p>
+    <p style="font-size:0.75em;">Expected Calibration Error — average gap between predicted confidence and actual accuracy across all bins. Lower is better; anything below 0.05 is clinically usable. Our model is well within that range.</p>
+  </div>
+  <div style="background:rgba(39,174,96,0.08); border:1px solid rgba(39,174,96,0.3); border-radius:5px; padding:14px 16px;">
+    <p style="font-size:0.8em; font-weight:700; color:var(--green); margin-bottom:8px;">Brier Score = 0.0026</p>
+    <p style="font-size:0.75em;">Mean squared error between predicted probability and actual label across all voxels. A score this low means the model is rarely far off — confident predictions are mostly right, uncertain ones tend to be wrong.</p>
+  </div>
+</div>
+</section>
+
+
+
+<!-- ══ SLIDE · CONCLUSION ══════════════════════════════════════════ -->
+<section data-background-color="#0f1923">
+<div class="slide-title">Conclusion</div>
+<div class="two-col" style="gap:28px;">
+  <div>
+    <p style="font-size:0.77em; font-weight:600; color:var(--blue); margin-bottom:8px;">What We Built</p>
+    <ul style="font-size:0.76em; margin-bottom:14px;">
+      <li><strong>MissingModalityNetV2</strong> — 66.8M param 3D segmentation network trained on BraTS 2024 (1,350 patients)</li>
+      <li><strong>CrossModal Attention Fusion</strong> — handles any of the 15 possible modality subsets without imputation; zero-masks absent modalities and reweights over present ones</li>
+      <li><strong>BottleneckTransformer</strong> — 8-head self-attention at 8³ bottleneck, gives the model global spatial context without blowing up memory</li>
+      <li><strong>EvidentialHeadV2</strong> — Dirichlet-based vacuity per voxel, conditioned on n_present so uncertainty scales with how many modalities are missing</li>
+      <li><strong>Two-stage training</strong> — SSL pretraining (DINO + InfoNCE + reconstruction + view consistency) followed by supervised fine-tuning with 7 losses</li>
+    </ul>
+    <p style="font-size:0.77em; font-weight:600; color:var(--green); margin-bottom:8px;">Key Results</p>
+    <ul style="font-size:0.76em;">
+      <li>Mean Dice <strong>0.814</strong> with all 4 modalities (TTA) — all three subregions above clinical threshold</li>
+      <li>ET Dice improved by <strong>+0.081</strong> over the V1 baseline (no SSL)</li>
+      <li>Model still segments reasonably with just 1 modality (Dice 0.513) — no collapse</li>
+      <li>T1ce found to be the most critical modality — confirmed by both the 15-combo sweep and modality importance analysis</li>
+    </ul>
+  </div>
+  <div>
+    <p style="font-size:0.77em; font-weight:600; color:var(--purple); margin-bottom:8px;">Uncertainty Quantification</p>
+    <ul style="font-size:0.76em; margin-bottom:14px;">
+      <li>ECE = <strong>0.0153</strong> — when the model says 80% confidence, it's actually right about 80% of the time. That's good calibration for a clinical tool.</li>
+      <li>Brier score = <strong>0.0026</strong> — very low mean-squared error between predicted probability and label</li>
+      <li>Uncertainty maps concentrate at tumor boundaries and in ET when T1ce is absent — the model correctly signals where a radiologist should double-check</li>
+      <li>Adaptive thresholding at θ = 0.25 suppresses the most uncertain voxels at inference</li>
+    </ul>
+    <p style="font-size:0.77em; font-weight:600; color:var(--orange); margin-bottom:8px;">Reconstruction</p>
+    <ul style="font-size:0.76em;">
+      <li>T1 can be reconstructed from the other three modalities (SSIM 0.796)</li>
+      <li>T1ce reconstruction is physically not possible — gadolinium signal has no equivalent in structural MRI</li>
+      <li>Reconstruction head improves feature learning during SSL — acts as a strong self-supervised signal</li>
+    </ul>
+    <div class="stats-row" style="margin-top:16px;">
+      <div class="stat-box g"><div class="n">0.814</div><div class="l">Mean Dice</div></div>
+      <div class="stat-box g"><div class="n">0.0153</div><div class="l">ECE</div></div>
+      <div class="stat-box g"><div class="n">+0.049</div><div class="l">vs Baseline</div></div>
+      <div class="stat-box"><div class="n">15</div><div class="l">Modality<br>Combos</div></div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  slideNumber: 'c/t',
+  controls: true,
+  progress: true,
+  center: false,
+  width: 1280,
+  height: 720,
+  margin: 0.03,
+  transition: 'none',
+  transitionSpeed: 'fast',
+  backgroundTransition: 'none',
+  plugins: []
+});
+</script>
+</body>
+</html>

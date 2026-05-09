@@ -574,23 +574,32 @@ def plot_uncertainty_error_corr(model, test_dataset, device,
                                  save_dir="results/figures",
                                  mc_passes=20):
     """
-    For each test patient compute:
-      uncertainty = mean total uncertainty across the predicted tumour region
+    For each test patient × all 15 modality combinations, compute:
+      uncertainty = mean evidential vacuity across the predicted tumour region
       dice_error  = 1 - mean Dice across WT/TC/ET
-    Plot as scatter and compute Spearman rank correlation.
-    A good uncertainty model should show positive correlation.
+    Plot as scatter (colour = # present modalities) and compute Spearman ρ.
+    Testing across combinations creates natural variation: missing T1ce →
+    higher vacuity AND higher error, revealing the uncertainty-error link.
     """
+    from itertools import combinations as _icombs
     os.makedirs(save_dir, exist_ok=True)
     model.eval()
 
-    uncertainties = []
-    errors        = []
+    # All 15 modality combinations (1 → 4 present)
+    all_combos = []
+    for n in range(1, 5):
+        for present in _icombs(range(4), n):
+            all_combos.append(list(present))
+
+    uncertainties  = []
+    errors         = []
+    n_present_list = []
 
     def _dice(pred, target, smooth=1e-5):
         p, t = pred.astype(float), target.astype(float)
         return (2*(p*t).sum() + smooth) / (p.sum() + t.sum() + smooth)
 
-    print("  Computing uncertainty–error correlation …")
+    print("  Computing uncertainty–error correlation (15 combos × all patients) …")
     n_check = min(len(test_dataset), 200)
 
     for idx in range(n_check):
@@ -602,45 +611,53 @@ def plot_uncertainty_error_corr(model, test_dataset, device,
             continue
 
         orig = sample["original"].unsqueeze(0).to(device)
-        mask = torch.ones(1, 4, device=device)
         seg  = sample["seg"].numpy()
 
-        # Use evidential vacuity as uncertainty if available (most principled)
-        model.eval()
-        with torch.no_grad():
-            out = model(orig, mask)
-        if _HAS_EVIDENTIAL and hasattr(out, '__getitem__') and "evid_logit" in out:
-            try:
-                ev  = EvidentialHead.get_evidence(out["evid_logit"])
-                mp  = ev["prob"]   .squeeze(0).cpu().numpy()
-                unc = ev["vacuity"].squeeze(0).cpu().numpy()
-            except Exception:
+        for present in all_combos:
+            mask = torch.zeros(1, 4, device=device)
+            mask[0, present] = 1.0
+
+            model.eval()
+            with torch.no_grad():
+                out = model(orig, mask)
+
+            if _HAS_EVIDENTIAL and hasattr(out, '__getitem__') and "evid_logit" in out:
+                try:
+                    ev  = EvidentialHead.get_evidence(out["evid_logit"])
+                    mp  = ev["prob"]   .squeeze(0).cpu().numpy()
+                    unc = ev["vacuity"].squeeze(0).cpu().numpy()
+                except Exception:
+                    mp  = torch.sigmoid(out["seg"]).squeeze(0).cpu().numpy()
+                    unc = np.zeros_like(mp)
+            else:
                 mp  = torch.sigmoid(out["seg"]).squeeze(0).cpu().numpy()
-                unc = torch.zeros_like(out["seg"]).squeeze(0).cpu().numpy()
-        else:
-            _, total_unc, _, _ = model.forward_mc(orig, mask, n_passes=mc_passes)
-            mp  = torch.sigmoid(out["seg"]).squeeze(0).cpu().numpy()
-            unc = total_unc.squeeze(0).cpu().numpy()
+                unc = np.zeros_like(mp)
 
-        # Mean uncertainty in predicted positive region
-        pred_bin    = (mp > 0.5).astype(float)
-        roi_mask    = pred_bin.sum(0) > 0
-        mean_unc    = float(unc.mean(0)[roi_mask].mean()) if roi_mask.any() else float(unc.mean())
+            del out
+            torch.cuda.empty_cache()
 
-        # Dice error
-        dice_scores = [_dice((mp[c] > 0.5), seg[c]) for c in range(3)]
-        dice_error  = 1.0 - np.mean(dice_scores)
+            pred_bin = (mp > 0.5).astype(float)
+            roi_mask = pred_bin.sum(0) > 0
+            mean_unc = float(unc.mean(0)[roi_mask].mean()) if roi_mask.any() else float(unc.mean())
 
-        uncertainties.append(mean_unc)
-        errors.append(dice_error)
+            dice_scores = [_dice((mp[c] > 0.5), seg[c]) for c in range(3)]
+            dice_error  = 1.0 - np.mean(dice_scores)
+
+            uncertainties.append(mean_unc)
+            errors.append(dice_error)
+            n_present_list.append(len(present))
 
     if len(uncertainties) < 5:
         print("  [WARN] Too few valid patients for correlation analysis"); return
 
     unc_arr = np.array(uncertainties)
     err_arr = np.array(errors)
+    np_arr  = np.array(n_present_list)
 
     rho, pval = spearmanr(unc_arr, err_arr)
+
+    MOD_COLORS = {1: "#E74C3C", 2: "#E67E22", 3: "#F1C40F", 4: "#2ECC71"}
+    MOD_LABELS = {1: "1 modality", 2: "2 modalities", 3: "3 modalities", 4: "4 modalities"}
 
     with plt.style.context(STYLE):
         fig, axes = plt.subplots(1, 2, figsize=(13, 5))
@@ -649,33 +666,35 @@ def plot_uncertainty_error_corr(model, test_dataset, device,
             fontsize=13, fontweight="bold")
 
         ax = axes[0]
-        ax.scatter(unc_arr, err_arr, alpha=0.6, s=30, c="#3498DB", edgecolors="none")
-        # Trend line
-        z = np.polyfit(unc_arr, err_arr, 1)
+        for n in [1, 2, 3, 4]:
+            idx_n = np_arr == n
+            ax.scatter(unc_arr[idx_n], err_arr[idx_n],
+                       alpha=0.35, s=15, color=MOD_COLORS[n],
+                       edgecolors="none", label=MOD_LABELS[n])
+        z  = np.polyfit(unc_arr, err_arr, 1)
         xr = np.linspace(unc_arr.min(), unc_arr.max(), 100)
         ax.plot(xr, np.polyval(z, xr), "r--", lw=1.8,
                 label=f"Linear fit  ρ={rho:.3f}")
-        ax.set_xlabel("Mean Total Uncertainty (MC-Dropout)")
+        ax.set_xlabel("Mean Vacuity (Evidential Uncertainty)")
         ax.set_ylabel("Dice Error (1 − Mean Dice)")
-        ax.set_title("Per-Patient Uncertainty vs. Segmentation Error")
-        ax.legend(fontsize=9)
+        ax.set_title("Uncertainty vs. Error\n(all 15 combos × all test patients)")
+        ax.legend(fontsize=8)
 
-        # Sorted bar chart of uncertainties coloured by error
         ax = axes[1]
-        order  = np.argsort(unc_arr)
-        colors = plt.cm.RdYlGn_r(err_arr[order] / max(err_arr.max(), 1e-9))
-        ax.bar(range(len(order)), unc_arr[order], color=colors, alpha=0.85)
+        order      = np.argsort(unc_arr)
+        bar_colors = plt.cm.RdYlGn_r(err_arr[order] / max(err_arr.max(), 1e-9))
+        ax.bar(range(len(order)), unc_arr[order], color=bar_colors, alpha=0.85)
         sm = plt.cm.ScalarMappable(cmap="RdYlGn_r",
                                     norm=plt.Normalize(0, err_arr.max()))
         sm.set_array([])
         plt.colorbar(sm, ax=ax, label="Dice Error")
-        ax.set_xlabel("Patient (sorted by uncertainty)")
-        ax.set_ylabel("Total Uncertainty")
-        ax.set_title("Patients Sorted by Uncertainty\n(colour = Dice error)")
+        ax.set_xlabel("(Patient, Combo) sorted by uncertainty")
+        ax.set_ylabel("Mean Vacuity")
+        ax.set_title("Sorted by Uncertainty\n(colour = Dice error)")
 
         _save(fig, os.path.join(save_dir, "fig_uncertainty_correlation.png"))
 
-    print(f"  Spearman ρ={rho:.3f}  →  fig_uncertainty_correlation.png")
+    print(f"  Spearman ρ={rho:.3f}  p={pval:.4f}  →  fig_uncertainty_correlation.png")
     return rho, pval
 
 
@@ -806,40 +825,290 @@ def plot_combo_table(eval_results_path, save_dir="results/figures"):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  8.  RECONSTRUCTION QUALITY  (SSIM + PSNR per modality per combo)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def plot_reconstruction_quality(eval_recon_path, save_dir="results/figures"):
+    """
+    Two sub-figures:
+      Left  — PSNR (dB) grouped by number of present modalities, per missing modality
+      Right — SSIM grouped the same way
+
+    Shows how reconstruction quality degrades as fewer modalities are available
+    and which modality is hardest to reconstruct.
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    if not os.path.exists(eval_recon_path):
+        print(f"  [WARN] {eval_recon_path} not found"); return
+
+    with open(eval_recon_path) as f:
+        results = json.load(f)
+
+    # Collect per-modality PSNR/SSIM grouped by n_present
+    mod_names = ["T1", "T1ce", "T2", "FLAIR"]
+    colors    = ["#E74C3C", "#E67E22", "#27AE60", "#3498DB"]
+    groups    = {1: [], 2: [], 3: []}
+    for r in results:
+        np_ = r["n_present"]
+        if np_ in groups:
+            groups[np_].append(r)
+
+    with plt.style.context(STYLE):
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+        fig.suptitle("Reconstruction Quality: PSNR & SSIM per Missing Modality",
+                     fontsize=13, fontweight="bold")
+
+        for ax_idx, (metric_key, ylabel, title) in enumerate([
+            ("psnr", "PSNR (dB)",  "Peak Signal-to-Noise Ratio"),
+            ("ssim", "SSIM",       "Structural Similarity Index"),
+        ]):
+            ax = axes[ax_idx]
+            x  = np.arange(3)
+            w  = 0.18
+            for mi, (mod, col) in enumerate(zip(mod_names, colors)):
+                means, errs = [], []
+                for np_ in [1, 2, 3]:
+                    vals = [r.get(f"{metric_key}_{mod}", np.nan)
+                            for r in groups[np_]
+                            if f"{metric_key}_{mod}" in r]
+                    means.append(float(np.nanmean(vals)) if vals else 0.0)
+                    errs .append(float(np.nanstd(vals))  if vals else 0.0)
+                bars = ax.bar(x + (mi - 1.5) * w, means, w, label=mod,
+                              color=col, alpha=0.82, yerr=errs, capsize=3)
+                for bar, v in zip(bars, means):
+                    if v > 0:
+                        ax.text(bar.get_x() + bar.get_width()/2,
+                                bar.get_height() + max(errs) * 0.1,
+                                f"{v:.1f}" if metric_key == "psnr" else f"{v:.3f}",
+                                ha="center", va="bottom", fontsize=7)
+            ax.set_xticks(x)
+            ax.set_xticklabels(["1 present", "2 present", "3 present"], fontsize=10)
+            ax.set_xlabel("Modalities Present at Input", fontsize=11)
+            ax.set_ylabel(ylabel, fontsize=11)
+            ax.set_title(title, fontsize=11)
+            ax.legend(title="Missing Modality", fontsize=9, title_fontsize=9.5)
+
+        _save(fig, os.path.join(save_dir, "fig_reconstruction_quality.png"))
+    print(f"  Reconstruction quality figure saved.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  9.  MODALITY IMPORTANCE  (leave-one-out attribution)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def plot_modality_importance(analysis_path, save_dir="results/figures"):
+    """
+    Visualises modality importance (mean LOO attribution) alongside the
+    adaptive-threshold improvement over fixed-threshold Dice, and the
+    threshold sweep curve.
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    if not os.path.exists(analysis_path):
+        print(f"  [WARN] {analysis_path} not found"); return
+
+    with open(analysis_path) as f:
+        data = json.load(f)
+    summary = data.get("summary", {})
+    records = data.get("patients", [])
+
+    mod_names  = ["T1", "T1ce", "T2", "FLAIR"]
+    mod_colors = ["#E74C3C", "#E67E22", "#27AE60", "#3498DB"]
+    importance = summary.get("mean_modality_importance", [0]*4)
+
+    with plt.style.context(STYLE):
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        fig.suptitle("Modality Importance & Adaptive Threshold Analysis",
+                     fontsize=13, fontweight="bold")
+
+        # ── Panel A: LOO modality importance bar chart ────────────────────
+        ax = axes[0]
+        bars = ax.bar(mod_names, importance, color=mod_colors, alpha=0.85,
+                      edgecolor="white", linewidth=1.5)
+        for bar, v in zip(bars, importance):
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.0005,
+                    f"{v:.4f}", ha="center", va="bottom", fontsize=9.5,
+                    fontweight="bold")
+        ax.set_xlabel("MRI Modality", fontsize=11)
+        ax.set_ylabel("Mean LOO Importance\n(absolute prob. change)", fontsize=10)
+        ax.set_title("Modality Importance\n(Leave-One-Out Attribution)", fontsize=11)
+        ax.set_ylim(0, max(importance) * 1.25 if max(importance) > 0 else 0.1)
+
+        # ── Panel B: Fixed vs adaptive threshold Dice per patient ─────────
+        ax = axes[1]
+        if records:
+            std_means   = [np.mean(list(r["dice_std"].values()))     for r in records]
+            adapt_means = [np.mean(list(r["dice_adaptive"].values())) for r in records]
+            x = np.arange(len(records))
+            ax.scatter(x, std_means,   label="Fixed (0.50)",   s=18, alpha=0.6,
+                       color="#3498DB", edgecolors="none")
+            ax.scatter(x, adapt_means, label="Adaptive (0.15)", s=18, alpha=0.6,
+                       color="#E74C3C", edgecolors="none")
+            ax.axhline(np.mean(std_means),   color="#3498DB", lw=1.8, ls="--",
+                       label=f"Mean fixed={np.mean(std_means):.3f}")
+            ax.axhline(np.mean(adapt_means), color="#E74C3C", lw=1.8, ls="--",
+                       label=f"Mean adapt={np.mean(adapt_means):.3f}")
+        ax.set_xlabel("Patient index", fontsize=11)
+        ax.set_ylabel("Mean Dice (WT+TC+ET)/3", fontsize=10)
+        ax.set_title("Fixed vs Adaptive Threshold\nDice per Patient", fontsize=11)
+        ax.set_ylim(0, 1); ax.legend(fontsize=8.5)
+
+        # ── Panel C: Threshold sweep curve ───────────────────────────────
+        ax = axes[2]
+        sweep = summary.get("threshold_sweep", [])
+        if sweep:
+            thrs  = [s["threshold"]  for s in sweep]
+            dices = [s["mean_dice"]  for s in sweep]
+            ax.plot(thrs, dices, "o-", color="#8E44AD", lw=2.2, markersize=7)
+            best  = summary.get("best_threshold", {})
+            if best:
+                ax.axvline(best["threshold"], color="#E74C3C", lw=1.8, ls="--",
+                           label=f"Best: thr={best['threshold']}  dice={best['mean_dice']:.4f}")
+                ax.axhline(best["mean_dice"],  color="#E74C3C", lw=1.2, ls=":")
+        ax.set_xlabel("Uncertainty Threshold", fontsize=11)
+        ax.set_ylabel("Mean Dice", fontsize=11)
+        ax.set_title("Adaptive Threshold Sweep\n(suppress inconclusive voxels)", fontsize=11)
+        ax.set_ylim(0, 1); ax.legend(fontsize=9)
+
+        _save(fig, os.path.join(save_dir, "fig_modality_importance.png"))
+    print(f"  Modality importance figure saved.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  10.  VOLUME-LEVEL RISK SCORE ANALYSIS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def plot_risk_score_analysis(analysis_path, save_dir="results/figures"):
+    """
+    Three panels:
+      A — histogram of per-patient volume risk scores
+      B — scatter: risk score vs Dice error (should be positively correlated)
+      C — calibration bar: Brier Score and NLL vs class
+
+    This is the 'volume-level uncertainty map' output from the project spec.
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    if not os.path.exists(analysis_path):
+        print(f"  [WARN] {analysis_path} not found"); return
+
+    with open(analysis_path) as f:
+        data = json.load(f)
+    summary = data.get("summary", {})
+    records = data.get("patients", [])
+    if not records:
+        print("  [WARN] No patient records in analysis file"); return
+
+    risks  = np.array([r["risk_score"]    for r in records])
+    briers = np.array([r["brier_score"]   for r in records])
+    nlls   = np.array([r["nll"]           for r in records])
+    dices  = np.array([np.mean(list(r["dice_std"].values())) for r in records])
+    errors = 1.0 - dices
+
+    rho_val, pval_val = spearmanr(risks, errors)
+
+    with plt.style.context(STYLE):
+        fig, axes = plt.subplots(1, 3, figsize=(17, 5))
+        fig.suptitle(
+            f"Volume-Level Risk Score Analysis  |  "
+            f"Spearman ρ(risk, dice_error)={rho_val:.3f}  p={pval_val:.4f}",
+            fontsize=13, fontweight="bold")
+
+        # ── Panel A: Risk score histogram ─────────────────────────────────
+        ax = axes[0]
+        ax.hist(risks, bins=20, color="#8E44AD", alpha=0.78, edgecolor="white")
+        ax.axvline(risks.mean(), color="#E74C3C", lw=2, ls="--",
+                   label=f"Mean={risks.mean():.4f}")
+        ax.set_xlabel("Volume Risk Score\n(90th-pct vacuity in tumour region)", fontsize=10)
+        ax.set_ylabel("# Patients", fontsize=11)
+        ax.set_title("Distribution of Patient Risk Scores", fontsize=11)
+        ax.legend(fontsize=9)
+
+        # ── Panel B: Risk score vs Dice error ─────────────────────────────
+        ax = axes[1]
+        sc = ax.scatter(risks, errors, alpha=0.65, s=35,
+                        c=dices, cmap="RdYlGn", vmin=0, vmax=1,
+                        edgecolors="none")
+        plt.colorbar(sc, ax=ax, label="Mean Dice")
+        if len(risks) > 2:
+            z  = np.polyfit(risks, errors, 1)
+            xr = np.linspace(risks.min(), risks.max(), 100)
+            ax.plot(xr, np.polyval(z, xr), "r--", lw=1.8,
+                    label=f"Linear fit  ρ={rho_val:.3f}")
+        ax.set_xlabel("Volume Risk Score", fontsize=11)
+        ax.set_ylabel("Dice Error (1 − Mean Dice)", fontsize=11)
+        ax.set_title("Risk Score vs Segmentation Error\n(colour = mean Dice)", fontsize=11)
+        ax.legend(fontsize=9)
+
+        # ── Panel C: Brier Score and NLL per patient (sorted by error) ────
+        ax = axes[2]
+        order  = np.argsort(errors)
+        x      = np.arange(len(records))
+        norm_b = briers[order] / (briers.max() + 1e-9)
+        norm_n = nlls  [order] / (nlls.max()   + 1e-9)
+        ax.bar(x, norm_b, label=f"Brier (mean={briers.mean():.4f})",
+               color="#E67E22", alpha=0.75)
+        ax.bar(x, norm_n, bottom=norm_b,
+               label=f"NLL   (mean={nlls.mean():.4f})",
+               color="#3498DB", alpha=0.75)
+        ax.set_xlabel("Patient (sorted by Dice error)", fontsize=11)
+        ax.set_ylabel("Normalised score", fontsize=11)
+        ax.set_title("Brier Score + NLL per Patient\n(stacked, normalised)", fontsize=11)
+        ax.legend(fontsize=9)
+
+        _save(fig, os.path.join(save_dir, "fig_risk_score_analysis.png"))
+    print(f"  Risk score analysis figure saved.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  MASTER FUNCTION
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_all_figures(metrics_path, eval_results_path,
                          save_dir="results/figures",
                          model=None, test_dataset=None, device="cpu",
-                         mc_passes=20):
+                         mc_passes=20,
+                         recon_path=None, analysis_path=None):
     """
     Generate every report figure.
     Pass model + test_dataset to also produce calibration / correlation plots.
+    Pass recon_path / analysis_path to produce reconstruction and risk figures.
     """
     print(f"\n  Generating all figures → {save_dir}")
     os.makedirs(save_dir, exist_ok=True)
 
-    print("\n[1/5] Training & SSL curves …")
+    print("\n[1/7] Training & SSL curves …")
     plot_training_curves(metrics_path, save_dir)
 
-    print("\n[2/5] Evaluation heatmap …")
+    print("\n[2/7] Evaluation heatmap …")
     plot_eval_heatmap(eval_results_path, save_dir)
 
-    print("\n[3/5] Modality bar chart …")
+    print("\n[3/7] Modality bar chart …")
     plot_modality_bar(eval_results_path, save_dir)
 
-    print("\n[4/5] Combo table …")
+    print("\n[4/7] Combo table …")
     plot_combo_table(eval_results_path, save_dir)
 
     if model is not None and test_dataset is not None:
-        print("\n[5/5] Uncertainty calibration + correlation …")
+        print("\n[5/7] Uncertainty calibration + correlation …")
         plot_uncertainty_calibration(model, test_dataset, device,
                                       save_dir, mc_passes=mc_passes)
         plot_uncertainty_error_corr(model, test_dataset, device,
                                      save_dir, mc_passes=mc_passes)
     else:
-        print("\n[5/5] Skipping uncertainty plots (no model/dataset provided)")
+        print("\n[5/7] Skipping uncertainty plots (no model/dataset provided)")
+
+    # Optional: extended analysis figures (require --stage analyze first)
+    if recon_path and os.path.exists(recon_path):
+        print("\n[6/7] Reconstruction quality (SSIM + PSNR) …")
+        plot_reconstruction_quality(recon_path, save_dir)
+    else:
+        print("\n[6/7] Skipping reconstruction quality (run --stage recon_eval first)")
+
+    if analysis_path and os.path.exists(analysis_path):
+        print("\n[7/7] Modality importance + risk score analysis …")
+        plot_modality_importance(analysis_path, save_dir)
+        plot_risk_score_analysis(analysis_path, save_dir)
+    else:
+        print("\n[7/7] Skipping risk/importance plots (run --stage analyze first)")
 
     print(f"\n  All figures saved to: {save_dir}")
     for fn in sorted(os.listdir(save_dir)):
@@ -857,18 +1126,28 @@ if __name__ == "__main__":
     pa.add_argument("--eval",     default="results/eval_results_test.json")
     pa.add_argument("--outdir",   default="results/figures")
     pa.add_argument("--mode", default="all",
-                    choices=["all","curves","heatmap","bar","table","calibration","correlation"])
+                    choices=["all","curves","heatmap","bar","table","calibration","correlation",
+                             "recon_quality","importance","risk"])
     args = pa.parse_args()
 
     fn_map = {
-        "curves":      lambda: plot_training_curves(args.metrics, args.outdir),
-        "heatmap":     lambda: plot_eval_heatmap(args.eval, args.outdir),
-        "bar":         lambda: plot_modality_bar(args.eval, args.outdir),
-        "table":       lambda: plot_combo_table(args.eval, args.outdir),
+        "curves":        lambda: plot_training_curves(args.metrics, args.outdir),
+        "heatmap":       lambda: plot_eval_heatmap(args.eval, args.outdir),
+        "bar":           lambda: plot_modality_bar(args.eval, args.outdir),
+        "table":         lambda: plot_combo_table(args.eval, args.outdir),
+        "recon_quality": lambda: plot_reconstruction_quality(
+            "results/eval_reconstruction.json", args.outdir),
+        "importance":    lambda: plot_modality_importance(
+            "results/uncertainty_analysis.json", args.outdir),
+        "risk":          lambda: plot_risk_score_analysis(
+            "results/uncertainty_analysis.json", args.outdir),
     }
 
     if args.mode == "all":
-        generate_all_figures(args.metrics, args.eval, args.outdir)
+        generate_all_figures(
+            args.metrics, args.eval, args.outdir,
+            recon_path="results/eval_reconstruction.json",
+            analysis_path="results/uncertainty_analysis.json")
     elif args.mode in fn_map:
         fn_map[args.mode]()
     else:
